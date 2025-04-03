@@ -30,8 +30,8 @@ This simulation models cellular development using a binary tree structure where:
 1. Clone the repository:
 
 ```bash
-git clone https://github.com/yourusername/cell-lineage-simulation.git
-cd cell-lineage-simulation
+git clone https://github.com/lee-dan/CellLineageSimulation.git
+cd CellLineageSimulation
 ```
 
 2. Build the project:
@@ -107,18 +107,10 @@ Founder cells mark the beginning of specialized body parts and have modified cel
 new_cycle_time = base_time * (5/6 + random * 1/3)
 ```
 
-## Contributing
+## Author
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+**Daniel Lee** - [GitHub](https://github.com/lee-dan)
 
-## License
+## Acknowledgments
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Citation
-
-If you use this software in your research, please cite:
-
-```
-Lee, D. (2021). Cellular Phylodynamic Lineage Simulation of Body Parts.
-```
+This project was developed to study cell lineage development and body part formation through computational simulation.
