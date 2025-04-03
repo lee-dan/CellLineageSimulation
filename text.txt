@@ -1,0 +1,209 @@
+// Daniel Lee
+// 8-4-21
+// Cellular Phylodynamic Lineage Simulation of Body Parts
+// Packages used for this simulation
+import java.util.*;
+import java.io.*;
+/*
+The "Cell" class defines the characteristics of each cell
+*/
+class Cell {
+ // Characteristics:
+ int BinaryCellName; // The binary-cell-name; to understand what this is, see the paper.
+ int generation; /* The generation of the cell
+ THE ZYGOTE EXISTS IN GENERATION=1,
+ THE NEXT TWO CELLS EXISTS IN GENERATION=2,
+ ETC */
+ double CellCycleTime; // Cell cycle time, C., for this cell
+ Cell left, right; // This defines the two cells (children) that arise from a cell division.
+ boolean IsQuiescent; // State of being quiescent or not
+ // CREATION OF A NEW CELL ON THE CELL LINEAGE
+ public Cell (int BinaryCellName, int generation, double CellCycleTime) {
+ this.BinaryCellName = BinaryCellName;
+ this.generation = generation;
+ this.CellCycleTime = CellCycleTime;
+ left = right = null;
+ }
+}
+/*
+The "WholeAnimalCellLineage" class used to store away information on the cell lineage
+*/
+class WholeAnimalCellLineage {
+ Cell zygote; // The zygote cell
+ int TotalNumberOfCells; // Total number of cells to be simulated
+ int NumberOfAliveCells = 1; // Number of alive cells at any given moment
+ int generation = 1; // Latest generation in the cell lineage
+ double PresetCellCycleTime; // The uniform cell cycle time for all cells before the first founder cell
+ ArrayList<String> FounderCells; // Contains a list of all founder cells' binary-cell-names in the cell lineage
+ /* Used to calculate the mitotic fraction */
+ double a;
+ double b;
+ StringBuffer OutputFormat; // Contains the newick-formatted representation of the cell lineage
+ // This contains all the necessary information about each cell in the cell lineage
+ // to create a nice figure using Icytree (https://icytree.org/)
+ // It consists of one long string with numbers, parenthesis, commas, and colons.
+
+ // CREATION OF A NEW CELL LINEAGE
+ public WholeAnimalCellLineage() throws IOException {
+ getInfo(); // Retrieve user-inputted parameters
+ }
+ /*
+ Generate the cell lineage based on given parameters
+ */
+ public void generate() {
+ zygote = new Cell(0b1, 1, PresetCellCycleTime); // Creation of the zygote
+65
+ Queue<Cell> queue = new LinkedList<>(); // Contains a list (in order) of all cells that will divide
+ // starts with the zygote
+ queue.add(zygote);
+ // Create the output format (with just the zygote) and update it as more cells are created
+ OutputFormat = new StringBuffer(zygote.BinaryCellName + ":" + String.format("%.4f", zygote.CellCycleTime));
+ int NewickIndex = -1; // Index to add future cells
+ // Run the simulation until the desired number of cells is reached
+ while (NumberOfAliveCells < TotalNumberOfCells) {
+ Cell cell = queue.remove(); // Select the cell that may divide
+ // Calculate (using the binary-cell-name) if there is a new generation in the cell lineage
+ if (cell.BinaryCellName == 0b1 || (int) (Math.ceil((Math.log(cell.BinaryCellName) / Math.log(2)))) == (int)
+(Math.floor(((Math.log(cell.BinaryCellName) / Math.log(2)))))) {
+ // Increment the latest generation in the cell lineage
+ generation++;
+ // Reset the newick index
+ NewickIndex = 0;
+ while (OutputFormat.charAt(NewickIndex) == '(') {
+ NewickIndex++;
+ }
+ }
+ /*
+ ------ CHECK IF SELECTED CELL IS A FOUNDER CELL ------
+ */
+ // Iterate through list of founder cells' binary-cell-names and compare to selected cell's binary-cell-name
+ for (int i = FounderCells.size() - 1; i >= 0; i--) {
+ // Candidate founder cell binary-cell-name
+ String PotentialFounderCell = FounderCells.get(i);
+ // Cell binary-cell-name
+ String CellBinaryCellName = Integer.toBinaryString(cell.BinaryCellName);
+ /*
+ Iterate through, digit by digit, the candidate founder cell's binary-cell-name and compare it to the selected cell's
+ */
+ boolean isFounder = true;
+ for (int j = 0; j < PotentialFounderCell.length() && isFounder; j++) {
+
+ // Check if any digit is different or if the binary-cell-names have different lengths
+ // --> Cell is not this founder cell
+ if (PotentialFounderCell.length() != CellBinaryCellName.length() || PotentialFounderCell.charAt(j) !=
+CellBinaryCellName.charAt(j)) {
+ isFounder = false;
+ }
+ }
+ // Found matching binary-cell-name
+ if (isFounder) {
+ // Set the new founder cell's cell cycle time, C., to a random number
+ // (and all of its children)
+ cell.CellCycleTime = PresetCellCycleTime * 5/6 + Math.random() * PresetCellCycleTime * 1/3;
+ break;
+ }
+ }
+ /*
+66
+ ------ CELL DIVISION + CREATION OF THE NEW CELLS ------
+ */
+ // CHECK THE SELECTED CELL'S QUIESCENCE
+ if (cell.IsQuiescent) {
+ /*
+ Continuously increase the cell cycle time of the quiescent cell each iteration
+ to simulate its inability to divide.
+ */
+ queue.add(cell);
+ cell.CellCycleTime += cell.CellCycleTime;
+ // Update OutputFormat to increase the cell cycle time
+ int temporaryNewickIndex = NewickIndex; // temporaryNewickIndex is the left index of the cell cycle time
+ // in OutputFormat.
+ while (OutputFormat.charAt(temporaryNewickIndex) != ':') {
+ temporaryNewickIndex++;
+ }
+ temporaryNewickIndex++;
+ int temporaryNewickIndex2 = temporaryNewickIndex; // temporaryNewickIndex is the right index of the cell cycle time
+ // in OutputFormat.
+ while (OutputFormat.charAt(temporaryNewickIndex2) != ',' && OutputFormat.charAt(temporaryNewickIndex2) != ')') {
+ temporaryNewickIndex2++;
+ }
+ OutputFormat.replace(temporaryNewickIndex, temporaryNewickIndex2, String.format("%.4f", cell.CellCycleTime)); //
+Update the OutputFormat
+ NewickIndex = temporaryNewickIndex2; // Update the NewickIndex
+ } else {
+ // CELL IS NOT QUIESCENT AND WILL DIVIDE
+ // CREATION OF "LEFT" CHILD
+ cell.left = new Cell(cell.BinaryCellName * 0b10, generation, cell.CellCycleTime);
+ double mitoticFraction = Math.pow(a, Math.pow(NumberOfAliveCells, b)); // Calculate mitotic fraction;
+ // Probability the cell can divide
+ if (Math.random() > mitoticFraction) {
+ cell.left.IsQuiescent = true;
+ }
+ queue.add(cell.left);
+ // CREATION OF "RIGHT" CHILD
+ cell.right = new Cell(cell.BinaryCellName * 0b10 + 0b1, generation, cell.CellCycleTime);
+ mitoticFraction = Math.pow(a, Math.pow(NumberOfAliveCells, b)); // Calculate mitotic fraction;
+ // Probability the cell can divide
+ if (Math.random() > mitoticFraction) {
+ cell.right.IsQuiescent = true;
+ }
+ queue.add(cell.right);
+ NumberOfAliveCells++; // Calculate net increase of alive cells (1 splits into 2)
+ /*
+ ------ UPDATE THE OUTPUT FORMAT ------
+ */
+ OutputFormat.insert(NewickIndex, "(" + Integer.toBinaryString(cell.left.BinaryCellName) + ":" + String.format("%.4f",
+cell.left.CellCycleTime) + "," + Integer.toBinaryString(cell.right.BinaryCellName) + ":" + String.format("%.4f",
+cell.right.CellCycleTime) + ")");
+ }
+67
+ // Update NewickIndex for future cells
+ while (OutputFormat.charAt(NewickIndex) != ')' && !cell.IsQuiescent) {
+ NewickIndex++;
+ }
+ while (NewickIndex < OutputFormat.length() && OutputFormat.charAt(NewickIndex) != ',' && generation != 1) {
+ NewickIndex++;
+ }
+ NewickIndex++;
+ while (NewickIndex < OutputFormat.length() && OutputFormat.charAt(NewickIndex) == '(') {
+ NewickIndex++;
+ }
+ }
+ }
+ /*
+ Used to collect user input for the cell lineage
+ */
+ public void getInfo() throws IOException {
+ BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+ System.out.println("Enter the desired total number of cells: ");
+ TotalNumberOfCells = Integer.parseInt(reader.readLine());
+ System.out.println("Enter the uniform cell cycle time: ");
+ PresetCellCycleTime = Double.parseDouble(reader.readLine());
+ System.out.println("Enter a for the mitotic fraction: ");
+ a = Double.parseDouble(reader.readLine());
+ System.out.println("Enter b for the mitotic fraction: ");
+ b = Double.parseDouble(reader.readLine());
+ System.out.println("Which cells will correspond to a new body part? (Enter the binary-cell-names separated by spaces): ");
+ String bodyParts = reader.readLine();
+ FounderCells = new ArrayList<String>(Arrays.asList(bodyParts.split(" ")));
+ System.out.println("Great! Now submit the file named: 'WholeAnimalCellLineage.tree' to icytree.org");
+ }
+ /*
+ Generate newick formatted file:
+ https://en.wikipedia.org/wiki/Newick_format#Grammar
+ */
+ public void createNewickFile() throws IOException {
+ try (PrintWriter fout = new PrintWriter(new BufferedWriter(new FileWriter("WholeAnimalCellLineage.tree")))) { // Create new
+file to store OutputFormat
+ fout.println(OutputFormat); // Store OutputFormat in the created file
+ } catch (IOException e) {
+ System.out.println(e);
+ }
+ }
+}
+public class CellularPhylodynamicLineageSimulationBODYPARTS {
+ public static void main(String[] args) throws IOException {
+ WholeAnimalCellLineage tree = new WholeAnimalCellLineage(); // Create the cell lineage
+ tree.generate(); // Generate the cell lineage
+ tree.createNewickFile(); // Create the newick file named "WholeAnimalCellLineage.tree"
+ }
